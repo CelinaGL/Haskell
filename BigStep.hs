@@ -94,9 +94,9 @@ mudaVar ((s,i):xs) v n
 ebigStep :: (E,Memoria) -> Int
 ebigStep (Var x,s) = procuraVar s x
 ebigStep (Num n,s) = n
-ebigStep (Soma e1 e2,s)  = ebigStep (e1,s) + ebigStep (e2,s)
-ebigStep (Sub e1 e2,s)  = ebigStep (e1,s) - ebigStep (e2,s)
-ebigStep (Mult e1 e2,s)  = ebigStep (e1,s) * ebigStep (e2,s)
+ebigStep (Soma e1 e2,s)  = ebigStep(e1,s) + ebigStep(e2,s)
+ebigStep (Sub e1 e2,s)  = ebigStep(e1,s) - ebigStep(e2,s)
+ebigStep (Mult e1 e2,s)  = ebigStep(e1,s) * ebigStep(e2,s)
 ebigStep (Div e1 e2,s) = ebigStep(e1,s) `div` ebigStep (e2,s)
 
 
@@ -107,33 +107,46 @@ bbigStep (Not b,s)
    | bbigStep (b,s) == True     = False
    | otherwise                  = True 
 bbigStep (And b1 b2,s )
-   | bbigStep (b1, s) == True = bbigStep (b2, s)
+   | bbigStep (b1, s) == True = bbigStep(b2, s)
    | otherwise = False
 bbigStep (Or b1 b2,s ) 
-   | bbigStep(b1,s) == False = bbigStep (b2, s)
+   | bbigStep(b1,s) == False = bbigStep(b2, s)
    | otherwise = True
 bbigStep (Leq e1 e2,s)
-   | ebigStep (e1,s) <= ebigStep (e2, s) = True
+   | ebigStep (e1,s) <= ebigStep(e2, s) = True
    | otherwise = False
 bbigStep (Igual e1 e2,s)
-   | ebigStep (e1,s) == ebigStep (e2, s) = True
+   | ebigStep (e1,s) == ebigStep(e2, s) = True
    | otherwise = False
+
 
 cbigStep :: (C,Memoria) -> (C,Memoria)
 cbigStep (Skip,s) = (Skip,s)
+
 cbigStep (If b c1 c2,s)
-   | bbigStep (b, s) == True = cbigStep (c1, s)
-   | otherwise = cbigStep (c2, s)
+   | bbigStep (b, s) == True = cbigStep(c1, s)
+   | otherwise = cbigStep(c2, s)
+
 cbigStep (Seq c1 c2,s) =
-   let (_, s1) = cbigStep (c1, s) 
+   let (_, s1) = cbigStep(c1, s) 
    in cbigStep (c2, s1)
+
 cbigStep (Atrib (Var x) e,s) = (Skip, (mudaVar s x (ebigStep (e, s))))
+
 cbigStep (While b c, s)
-   | bbigStep (b, s) == True = Seq(c, (While b, c, s), s)
+   | bbigStep (b, s) == True = cbigStep(Seq c (While b c), s)
    | otherwise = (Skip, s)
- --  SevenTimes C   ---- Executa o comando C 7 vezes
-  -- DoWhile C B      ---- Do C While B: executa C enquanto B avalie para verdadeiro
-  -- DuplaATrib E E E E -- recebe 2 variáveis e 2 expressões (DuplaATrib (Var v1) (Var v2) e1 e2) e faz v1:=e1 e v2:=e2
+
+cbigStep (SevenTimes c, s) = cbigStep(Seq c (Seq c (Seq c (Seq c (Seq c (Seq c c))))), s)
+
+cbigStep (DoWhile c b, s) = cbigStep(Seq c (While b c), s)
+
+cbigStep (DuplaATrib (Var v1) (Var v2) e1 e2, s) = 
+   let n1 = ebigStep(e1, s)
+       n2 = ebigStep(e2, s) 
+   in (Skip, (mudaVar(mudaVar s v1 n1) v2 n2))
+
+cbigStep (AtribCond b (Var v) e1 e2) = cbigStep((cbigStep(If b cbigStep(Atrib v e1) cbigStep(Atrib v e2))), s)
   -- AtribCond B E E E --- AtribCond b (Var v1) e1 e2: se b for verdade, então faz v1:e1, se B for falso faz v1:=e2
   -- Swap E E -- swap(x,y): troca o conteúdo das variáveis x e y 
   -- Unless B C C   ---- Unless B C1 C2: se B avalia para falso, então executa C1, caso contrário, executa C2
